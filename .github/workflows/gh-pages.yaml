@@ -36,20 +36,9 @@ jobs:
         uses: actions/configure-pages@v3
       - name: Install python packages
         run: |
-          python3 wxPython-source.py
           python3 -m venv ../venv
           source ../venv/bin/activate
-          pip install -r requirements.txt -r wxPython-source.txt -r dev-requirements.txt -r pytest-requirements.txt
           pip install -e .
-      - name: Write to jsons
-        run: |
-          source ../venv/bin/activate
-          mkdir docs
-          mkdir docs/api
-          mkdir docs/api/version
-          mkdir docs/api/shortversion
-          python scripts/json-apis/version.py >> docs/api/version/index.json
-          python scripts/json-apis/shortversion.py >> docs/api/shortversion/index.json 
       - name: Build pages
         run: |
           source ../venv/bin/activate
