@@ -3,7 +3,7 @@ name = "libantplus"
 version = "0.0.1"
 
 [project.optional-dependencies]
-doc = ["pylint", "sphinx", "sphinx-pyreverse"]
+doc = ["pylint", "sphinx", "sphinx-pyreverse", "pydata-sphinx-theme"]
 
 [tool.isort]
 profile = "black"
