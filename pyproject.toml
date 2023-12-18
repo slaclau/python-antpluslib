@@ -1,6 +1,7 @@
 [project]
 name = "libantplus"
 version = "0.0.1"
+dependencies = ["pyusb"]
 
 [project.optional-dependencies]
 doc = ["pylint", "sphinx", "sphinx-pyreverse", "pydata-sphinx-theme"]
