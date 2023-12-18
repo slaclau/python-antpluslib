@@ -13,7 +13,7 @@ from libantplus.dongle import (
     TransmissionType,
     UnknownMessageID,
 )
-from fortius_ant.ant.message import (
+from libantplus.message import (
     AntMessage,
     Id,
     ChannelResponseMessage,

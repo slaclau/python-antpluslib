@@ -32,8 +32,8 @@ import time
 import traceback
 from datetime import datetime
 
-import fortius_ant.debug as debug
-from fortius_ant.constants import UsePythonLogging
+import libantplus.debug as debug
+UsePythonLoffing = True
 
 global LogfileCreated
 LogfileCreated = False
