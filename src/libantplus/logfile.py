@@ -33,7 +33,7 @@ import traceback
 from datetime import datetime
 
 import libantplus.debug as debug
-UsePythonLoffing = True
+UsePythonLogging = True
 
 global LogfileCreated
 LogfileCreated = False
