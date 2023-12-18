@@ -1,4 +1,4 @@
-"""Provides contstants needed for use of :package:`struct`.
+"""Provides constants needed for use of :package:`struct`.
 """
 # -------------------------------------------------------------------------------
 # Version info
