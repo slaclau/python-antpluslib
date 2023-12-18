@@ -1,4 +1,4 @@
-"""Extension of :module:`libantplus.interface` for ANT+."""
+"""Extension of :py:mod:`libantplus.interface` for ANT+."""
 from dataclasses import dataclass
 
 from libantplus.interface import AntInterface, UnsupportedPage
