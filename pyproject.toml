@@ -1,3 +1,6 @@
+[project]
+name = "libantplus"
+
 [project.optional-dependencies]
 doc = ["pyreverse"]
 
