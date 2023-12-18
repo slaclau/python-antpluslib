@@ -1,9 +1,9 @@
 """Extension of :module:`fortius_ant.ant.interface` for ANT+."""
 from dataclasses import dataclass
 
-from fortius_ant.ant.interface import AntInterface, UnsupportedPage
-from fortius_ant.ant.message import Id
-from fortius_ant.ant.plus.page import Page70
+from libantplus.interface import AntInterface, UnsupportedPage
+from libantplus.message import Id
+from libantplus.plus.page import Page70
 
 ant_plus_network_key = 0x45C372BDFB21A5B9
 

@@ -1,11 +1,11 @@
 """Interface for communicating as and with ANT+ HRMs."""
 import time
 
-from fortius_ant.ant.plus.interface import AntPlusInterface
-from fortius_ant.ant.message import Id, AntMessage, Manufacturer_garmin
-from fortius_ant.ant.plus.page import HRMPage
-from fortius_ant.ant.data import sport
-from fortius_ant.ant.interface import UnsupportedPage
+from libantplus.plus.interface import AntPlusInterface
+from libantplus.message import Id, AntMessage, Manufacturer_garmin
+from libantplus.plus.page import HRMPage
+from libantplus.data import sport
+from libantplus.interface import UnsupportedPage
 
 ModelNumber_HRM = 0x33  # char  antifier-value
 SerialNumber_HRM = 5975  # short 1959-7-5

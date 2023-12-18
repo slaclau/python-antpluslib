@@ -5,7 +5,7 @@ __version__ = "2023-04-16"
 
 import struct
 
-import fortius_ant.structConstants as sc
+import libantplus.structConstants as sc
 
 
 class AntPage(bytes):

@@ -11,8 +11,8 @@ import usb.core
 from usb.core import NoBackendError, USBError
 
 
-from fortius_ant import debug, logfile
-from fortius_ant.ant.message import (
+from libantplus import debug, logfile
+from libantplus.message import (
     ResetSystemMessage,
     RequestMessage,
     SetChannelFrequencyMessage,

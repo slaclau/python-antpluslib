@@ -1,5 +1,5 @@
 """Interfaces for communicating as and with Tacx Bushido trainers."""
-from fortius_ant.ant.plus.interface import AntPlusInterface
+from libantplus.plus.interface import AntPlusInterface
 
 
 class BushidoBrake(AntPlusInterface):

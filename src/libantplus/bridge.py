@@ -1,6 +1,6 @@
 """Bridge between two ANT interfaces."""
-from fortius_ant.ant.interface import AntInterface
-from fortius_ant.ant.message import AntMessage, Id
+from libantplus.interface import AntInterface
+from libantplus.message import AntMessage, Id
 
 
 class AntBridge:

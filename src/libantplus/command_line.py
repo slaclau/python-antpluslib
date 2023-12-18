@@ -2,10 +2,10 @@
 
 import logging
 
-from fortius_ant.ant import dongle, interface, bridge
-from fortius_ant.ant.data import sport
-from fortius_ant.ant.plus import hrm, scs
-from fortius_ant.ant.tacx import bushido
+from libantplus import dongle, interface, bridge
+from libantplus.data import sport
+from libantplus.plus import hrm, scs
+from libantplus.tacx import bushido
 
 usb_dongle = None
 testing = False

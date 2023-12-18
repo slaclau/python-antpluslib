@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from random import randint, random
 from threading import Thread
 
-from fortius_ant.ant.data.data import Data
+from libantplus.data.data import Data
 
 
 @dataclass

@@ -7,7 +7,7 @@ from enum import Enum
 import logging
 import time
 
-from fortius_ant.ant.dongle import (
+from libantplus.dongle import (
     power_0db,
     ChannelType,
     TransmissionType,
@@ -20,7 +20,7 @@ from fortius_ant.ant.message import (
     RequestMessage,
     SetChannelIdMessage,
 )
-from fortius_ant.ant.data.data import Data
+from libantplus.data.data import Data
 
 default_network_key = 0xC1677A553B21E4E8
 

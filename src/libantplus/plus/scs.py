@@ -2,10 +2,10 @@
 
 import time
 
-from fortius_ant.ant.plus.interface import AntPlusInterface
-from fortius_ant.ant.message import Id, AntMessage
-from fortius_ant.ant.plus.page import SCSPage
-from fortius_ant.ant.data import sport
+from libantplus.plus.interface import AntPlusInterface
+from libantplus.message import Id, AntMessage
+from libantplus.plus.page import SCSPage
+from libantplus.data import sport
 
 DeviceTypeID_bike_speed_cadence = 121
 

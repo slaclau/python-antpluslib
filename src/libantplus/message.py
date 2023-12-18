@@ -9,8 +9,8 @@ from typing import Dict
 
 from enum import Enum
 
-import fortius_ant.structConstants as sc
-from fortius_ant.ant.plus.page import AntPage
+import libantplus.structConstants as sc
+from libantplus.plus.page import AntPage
 
 
 class Id(Enum):
