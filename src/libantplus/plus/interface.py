@@ -1,4 +1,4 @@
-"""Extension of :module:`fortius_ant.ant.interface` for ANT+."""
+"""Extension of :module:`libantplus.interface` for ANT+."""
 from dataclasses import dataclass
 
 from libantplus.interface import AntInterface, UnsupportedPage
