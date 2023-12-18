@@ -1,0 +1,1 @@
+"""Extension of python logging."""
