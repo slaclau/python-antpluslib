@@ -1,4 +1,4 @@
-"""Provides constants needed for use of :py:module:`struct`.
+"""Provides constants needed for use of :py:mod:`struct`.
 """
 # -------------------------------------------------------------------------------
 # Version info
