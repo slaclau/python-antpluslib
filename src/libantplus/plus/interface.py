@@ -9,7 +9,7 @@ ant_plus_network_key = 0x45C372BDFB21A5B9
 
 
 class AntPlusInterface(AntInterface):
-    """Extension of :class:`AntInterface` for ANT+."""
+    """Extension of :class:`libantplus.interface.AntInterface` for ANT+."""
 
     interleave = 0
     interleave_reset: int
