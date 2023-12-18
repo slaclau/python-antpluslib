@@ -1,0 +1,37 @@
+[tool.isort]
+profile = "black"
+[tool.pylint.MAIN]
+load-plugins = [
+    "pylint.extensions.docparams"
+]
+[tool.pylint.MESSAGES-CONTROL]
+disable = [
+    "invalid-name",
+    "global-statement",
+]
+extension-pkg-allow-list = [
+	"wx",
+]
+[tool.flake8]
+max-line-length = 88
+max-doc-length = 88
+docstring-convention = "numpy"
+extend-select = [
+    "D417",
+]
+extend-ignore = [
+	"E203",
+	"D107",
+]
+extend-exclude = [
+	"src/fortius_ant/_version.py"
+]
+require-plugins = [     
+    "flake8-pydocstyle",
+    "flake8-pylint",
+    "flake8-json",
+]
+docstring_style = "numpy"
+[tool.mypy]
+ignore_missing_imports = true
+
