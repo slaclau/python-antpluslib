@@ -11,6 +11,7 @@ from enum import Enum
 
 import libantplus.structConstants as sc
 from libantplus.plus.page import AntPage
+from numpy import byte
 
 
 class Id(Enum):
@@ -39,9 +40,14 @@ class Id(Enum):
     ChannelStatus = 0x52
     ChannelTransmitPower = 0x60
 
+    EnableExtendedMessages = 0x66
+    LibConfig = 0x6E
+
     StartUp = 0x6F
 
     BurstData = 0x50
+
+    OpenRxScan = 0x5B
 
 
 # Manufacturer ID       see FitSDKRelease_21.20.00 profile.xlsx
@@ -63,7 +69,7 @@ class AntMessage(bytes):
         super(bytes, data)
 
     @classmethod
-    def compose(cls, message_id: Id, info: AntPage):
+    def compose(cls, message_id: Id, info: AntPage) -> "AntMessage":
         """Compose a message from its id and contents."""
         fSynch = sc.unsigned_char
         fLength = sc.unsigned_char
@@ -80,17 +86,19 @@ class AntMessage(bytes):
     @classmethod
     def decompose(cls, message) -> tuple:
         """Decompose a message into its constituent parts."""
-        synch = 0
+        sync = 0
         length = 0
         messageID = None
         checksum = 0
         info = binascii.unhexlify("")  # NULL-string bytes
         rest = ""  # No remainder (normal)
         burst_sequence_number = None
+        flag = 0
+        extended_data = b""
 
         try:
             assert message[0] == SYNC
-            synch = message[0]
+            sync = message[0]
             assert len(message) > 1
             length = message[1]
             assert len(message) == length + 4
@@ -105,6 +113,7 @@ class AntMessage(bytes):
             if length:
                 info = message[3 : 3 + length]  # Info, if length > 0
             checksum = message[3 + length]  # Character after info
+            assert checksum == int.from_bytes(calc_checksum(message))
         if len(message) > 4 + length:
             rest = message[4 + length :]  # Remainder (should not occur)
 
@@ -121,8 +130,14 @@ class AntMessage(bytes):
             ) >> 5  # Upper 3 bits # noqa: F841
             Channel = Channel & 0b00011111  # Lower 5 bits
 
+        if messageID in (Id.BroadcastData, Id.AcknowledgedData, Id.BurstData):
+            if length > 9:
+                flag = info[9]
+                extended_data = info[10:length]
+                info = info[0:9]
+
         return (
-            synch,
+            sync,
             length,
             messageID,
             info,
@@ -131,7 +146,49 @@ class AntMessage(bytes):
             Channel,
             DataPageNumber,
             burst_sequence_number,
+            flag,
+            extended_data,
         )
+
+    @staticmethod
+    def _decompose_extended_data(flag, extended_data) -> dict:
+        rtn = {}
+        count = 0
+        if (flag & 0x80) == 0x80:
+            rtn["channel_id"] = {}
+            rtn["channel_id"]["device_number"] = int.from_bytes(
+                extended_data[count : count + 2], byteorder="little"
+            )
+            rtn["channel_id"]["device_type_id"] = extended_data[count + 2]
+            rtn["channel_id"]["transmission_type"] = extended_data[count + 3]
+            count += 4
+        if (flag & 0x40) == 0x40:
+            rtn["rssi"] = {}
+            rtn["rssi"]["type"] = hex(extended_data[count])
+            if rtn["rssi"]["type"] == 0x20:
+                rtn["rssi"]["value"] = int.from_bytes(
+                    extended_data[count + 1].to_bytes(), signed=True
+                )
+                rtn["rssi"]["threshold"] = int.from_bytes(
+                    extended_data[count + 2].to_bytes(), signed=True
+                )
+            elif rtn["rssi"]["type"] == 0x10:
+                rtn["rssi"]["acg"] = int.from_bytes(
+                    extended_data[count + 1 : count + 2].to_bytes(), signed=True
+                )
+                rtn["rssi"]["threshold"] = int.from_bytes(
+                    extended_data[count + 2].to_bytes(), signed=True
+                )
+            count += 3
+            if rtn["rssi"]["type"] == 0x10:
+                count += 1
+        if (flag & 0x20) == 0x20:
+            rtn["timestamp"] = int.from_bytes(
+                extended_data[count : count + 2], byteorder="little"
+            )
+            count += 2
+
+        return rtn
 
     @classmethod
     def decompose_to_dict(cls, message) -> dict:
@@ -148,11 +205,13 @@ class AntMessage(bytes):
         rtn["page_number"] = response[7]
         if rtn["id"] == Id.BurstData:
             rtn["sequence_number"] = response[8]
-
-        if rtn["sync"] != SYNC:
-            raise ValueError
-        # if rtn["checksum"] != calc_checksum(message[0:-1]):
-        #    raise ValueError
+        if rtn["id"] in (Id.BroadcastData, Id.AcknowledgedData, Id.BurstData):
+            if response[9] != 0:
+                rtn["flag"] = response[9]
+                rtn["extended_data"] = response[10]
+                rtn["parsed_extended_data"] = cls._decompose_extended_data(
+                    response[9], response[10]
+                )
 
         return rtn
 
@@ -236,6 +295,46 @@ class SpecialMessageReceive(AntMessage):
         if message_id != cls.message_id:
             raise WrongMessageId(message_id, cls.message_id)
         return cls.decompose_to_dict(message)["info"]
+
+
+class OpenRxScanMessage(SpecialMessageSend):
+    """Open channel 0 in continuous scanning mode."""
+
+    message_id = Id.OpenRxScan
+    message_format = sc.no_alignment + sc.unsigned_char + sc.unsigned_char
+
+    @classmethod
+    def _parse_args(cls, **kwargs):
+        return struct.pack(cls.message_format, 0, 0)
+
+
+class EnableExtendedMessagesMessage(SpecialMessageSend):
+    """Enable extended messages."""
+
+    message_id = Id.EnableExtendedMessages
+    message_format = sc.no_alignment + sc.unsigned_char + sc.unsigned_char
+
+    @classmethod
+    def _parse_args(cls, **kwargs) -> bytes:
+        enable = int(kwargs["enable"])
+        return struct.pack(cls.message_format, 0, enable)
+
+
+class LibConfigMessage(SpecialMessageSend):
+    """Configure extended messages."""
+
+    message_id = Id.LibConfig
+    message_format = sc.no_alignment + sc.unsigned_char + sc.unsigned_char
+
+    @classmethod
+    def _parse_args(cls, **kwargs) -> bytes:
+        timestamp = kwargs["timestamp"] if "timestamp" in kwargs else False
+        rssi = kwargs["rssi"] if "rssi" in kwargs else False
+        channel_id = kwargs["channel_id"] if "channel_id" in kwargs else False
+
+        return struct.pack(
+            cls.message_format, 0, timestamp * 0x20 + rssi * 0x40 + channel_id * 0x80
+        )
 
 
 class UnassignChannelMessage(SpecialMessageSend):
@@ -510,9 +609,67 @@ class CapabilitiesMessage(SpecialMessageReceive):
     def to_dict(cls, message) -> dict:
         """Return max channels and networks."""
         info = cls._get_info(message)
+        length = cls.decompose_to_dict(message)["length"]
         rtn = {}
-        rtn["max_channels"] = info[0]
-        rtn["max_networks"] = info[1]
+        if length > 0:
+            rtn["max_channels"] = info[0]
+        if length > 1:
+            rtn["max_networks"] = info[1]
+        if length > 2:
+            bits = bin(info[2])[2:]
+            bits = "0" * (8 - len(bits)) + bits
+            rtn["standard_options"] = bits
+            rtn["standard_options_parsed"] = cls._parse_standard_options(bits)
+        if length > 3:
+            bits = bin(info[3])[2:]
+            bits = "0" * (8 - len(bits)) + bits
+            rtn["advanced_options"] = bits
+            rtn["advanced_options_parsed"] = cls._parse_advanced_options(bits)
+        if length > 4:
+            bits = bin(info[4])[2:]
+            bits = "0" * (8 - len(bits)) + bits
+            rtn["advanced_options2"] = bits
+            rtn["advanced_options2_parsed"] = cls._parse_advanced_options2(bits)
+        if length > 5:
+            rtn["max_sensrcore_channels"] = info[5]
+
+        return rtn
+
+    @staticmethod
+    def _parse_standard_options(bits):
+        rtn = {}
+        rtn["CAPABILITIES_NO_RECEIVE_CHANNELS"] = bits[7]
+        rtn["CAPABILITIES_NO_TRANSMIT_CHANNELS"] = bits[6]
+        rtn["CAPABILITIES_NO_RECEIVE_MESSAGES"] = bits[5]
+        rtn["CAPABILITIES_NO_TRANSMIT_MESSAGES"] = bits[4]
+        rtn["CAPABILITIES_NO_ACKD_MESSAGES"] = bits[3]
+        rtn["CAPABILITIES_NO_BURST_MESSAGES"] = bits[2]
+
+        return rtn
+
+    @staticmethod
+    def _parse_advanced_options(bits):
+        rtn = {}
+        rtn["CAPABILITIES_NETWORK_ENABLED"] = bits[6]
+        rtn["CAPABILITIES_SERIAL_NUMBER_ENABLED"] = bits[4]
+        rtn["CAPABILITIES_PER_CHANNEL_TX_POWER_ENABLED"] = bits[3]
+        rtn["CAPABILITIES_LOW_PRIORITY_SEARCH_ENABLED"] = bits[3]
+        rtn["CAPABILITIES_SCRIPT_ENABLED"] = bits[1]
+        rtn["CAPABILITIES_SEARCH_LIST_ENABLED"] = bits[0]
+
+        return rtn
+
+    @staticmethod
+    def _parse_advanced_options2(bits):
+        rtn = {}
+        rtn["CAPABILITIES_LED_ENABLED"] = bits[7]
+        rtn["CAPABILITIES_EXT_MESSAGE_ENABLED"] = bits[6]
+        rtn["CAPABILITIES_SCAN_MODE_ENABLED"] = bits[5]
+        rtn["CAPABILITIES_PROX_SEARCH_ENABLED"] = bits[3]
+        rtn["CAPABILITIES_EXT_ASSIGN_ENABLED"] = bits[2]
+        rtn["CAPABILITIES_FS_ANTFS_ENABLED"] = bits[1]
+        rtn["CAPABILITIES_FIT1_ENABLED"] = bits[0]
+
         return rtn
 
 

@@ -8,7 +8,6 @@ import logging
 import time
 
 from libantplus.dongle import (
-    power_0db,
     ChannelType,
     TransmissionType,
     UnknownMessageID,
@@ -23,6 +22,8 @@ from libantplus.message import (
 from libantplus.data.data import Data
 
 default_network_key = 0xC1677A553B21E4E8
+power_0db = 0x03
+
 
 parent_logger = logging.getLogger(__name__)
 
@@ -65,8 +66,7 @@ class AntInterface:
     slave_transmission_type = TransmissionType.PAIRING
     transmission_type = None
 
-    data_source: Data | None = None
-    data_target: Data | None = None
+    data: Data | None = None
 
     status = Status.UNASSIGNED
     action = None
@@ -130,7 +130,7 @@ class AntInterface:
     def _handle_channel_response_message(self, message: bytes):
         message_dict = ChannelResponseMessage.to_dict(message)
         code = message_dict["code"]
-        if code == ChannelResponseMessage.Code.EVENT_TX:
+        if code == ChannelResponseMessage.Code.EVENT_TX and self.master:
             return self.broadcast_message()
         if code == ChannelResponseMessage.Code.EVENT_CHANNEL_CLOSED:
             old_status = self.status
@@ -162,9 +162,14 @@ class AntInterface:
             ChannelResponseMessage.Code.EVENT_RX_SEARCH_TIMEOUT,
         ]:
             self.logger.warning("Received %s", code)
+            if code == ChannelResponseMessage.Code.EVENT_RX_FAIL:
+                return self._handle_rx_fail()
         else:
             self.logger.debug("Received %s", code)
         return None
+
+    def _handle_rx_fail(self):
+        pass
 
     def _handle_burst_data(self, info: bytes):
         self.logger.info("Ignoring burst message")
@@ -193,6 +198,11 @@ class AntInterface:
             if self.action == action:
                 return True
         return False
+
+    @staticmethod
+    def get_page_from_number(page_number, master=True):
+        """Return the subclass of AntPAge corresponding to the page number."""
+        raise NotImplementedError
 
 
 class WrongChannel(Exception):

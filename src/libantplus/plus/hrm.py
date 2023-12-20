@@ -71,11 +71,11 @@ class AntHRM(AntPlusInterface):
         return self._broadcast_page(0)
 
     def _broadcast_page(self, page_number: int, message_id=Id.BroadcastData):
-        assert isinstance(self.data_source, sport.HeartRateData)
-        with self.data_source.lock:
-            heart_rate = self.data_source.heart_rate
-            event_time = self.data_source.heart_rate_event_time
-            event_count = self.data_source.heart_rate_event_count
+        assert isinstance(self.data, sport.HeartRateData)
+        with self.data.lock:
+            heart_rate = self.data.heart_rate
+            event_time = self.data.heart_rate_event_time
+            event_count = self.data.heart_rate_event_count
 
         if event_time is not None and event_count is not None:
             self.heart_beat_event_time = event_time
@@ -142,11 +142,11 @@ class AntHRM(AntPlusInterface):
 
     def _handle_broadcast_data(self, data_page_number: int, info: bytes):
         data_page_number = data_page_number & 0x7F
-        assert isinstance(self.data_target, sport.HeartRateData)
-        self.data_target: sport.HeartRateData
-        with self.data_target.lock:
-            self.data_target.heart_rate = HRMPage.unpage(info)[-1]
-        self.logger.info("Received heart rate %d", self.data_target.heart_rate)
+        assert isinstance(self.data, sport.HeartRateData)
+        self.data: sport.HeartRateData
+        with self.data.lock:
+            self.data.heart_rate = HRMPage.unpage(info)[-1]
+        self.logger.info("Received heart rate %d", self.data.heart_rate)
         if data_page_number == 0:
             pass
         elif data_page_number == 2:

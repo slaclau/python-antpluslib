@@ -1,5 +1,6 @@
 """Interface with usb dongle."""
 from collections import deque
+import csv
 from enum import Enum, IntEnum
 import os
 import threading
@@ -31,9 +32,12 @@ from libantplus.message import (
     SetChannelSearchTimeoutMessage,
     OpenChannelMessage,
     CloseChannelMessage,
+    OpenRxScanMessage,
     SYNC,
     AntMessage,
     SetNetworkKeyMessage,
+    EnableExtendedMessagesMessage,
+    LibConfigMessage,
 )
 
 power_0db = 0x03
@@ -82,6 +86,7 @@ class Dongle:
 
     device = None
 
+    capabilities = None
     max_channels = None
     max_networks = None
     ant_version = None
@@ -90,6 +95,11 @@ class Dongle:
     networks = None
 
     messages_deque: deque = deque()
+
+    action = None
+
+    save_messages_to_file = False
+    message_log = "messages.log"
 
     def __init__(self, device_id: int | None = None):
         """Create a dongle class with the required device id."""
@@ -126,7 +136,7 @@ class Dongle:
                 network = self.networks.index(None, 1)
             except ValueError:
                 raise NoMoreNetworks from None
-            self._write(SetNetworkKeyMessage())
+            self._write(SetNetworkKeyMessage(network=network))
             start = time.time()
             while time.time() - start < timeout:
                 if self.network_flag:
@@ -140,11 +150,104 @@ class Dongle:
     def _clear_network(self, network_number):
         self.networks[network_number] = None
 
+    def enable_extended_messages(self):
+        """Enable extended messages."""
+        self._write(EnableExtendedMessagesMessage(enable=True))
+        self._wait_for_action(Id.EnableExtendedMessages)
+
+    def configure_extended_messages(self, **kwargs):
+        """Configure extended messages using libconfig."""
+        self._write(LibConfigMessage(**kwargs))
+        self.logger.info("Sent LibConfig message with args %s", kwargs)
+        self._wait_for_action(Id.LibConfig)
+
     def configure_channel(self, interface):
         """Send channel configuration messages to the dongle."""
         channel_number = self._get_next_channel()
         self.channels[channel_number] = interface
         interface.channel = channel_number
+        network = self._get_network_number(interface.network_key)
+        self._write(
+            AssignChannelMessage(
+                channel=channel_number,
+                type=interface.channel_type,
+                network=network,
+            )
+        )
+        assert interface.wait_for_status(interface.Status.ASSIGNED)
+
+        self._write(
+            SetChannelIdMessage(
+                channel=channel_number,
+                type=interface.transmission_type,
+                device_number=interface.device_number,
+                device_type_id=interface.device_type_id,
+            )
+        )
+        assert interface.wait_for_action(Id.ChannelID)
+
+        if interface.channel_frequency != 66:
+            self._write(
+                SetChannelFrequencyMessage(
+                    channel=channel_number,
+                    frequency=interface.channel_frequency,
+                )
+            )
+            assert interface.wait_for_action(Id.ChannelRfFrequency)
+
+        if interface.channel_period != 8192:
+            self._write(
+                SetChannelPeriodMessage(
+                    channel=channel_number, period=interface.channel_period
+                )
+            )
+            assert interface.wait_for_action(Id.ChannelPeriod)
+
+        if interface.transmit_power != power_0db:
+            self._write(
+                SetChannelTransmitPowerMessage(
+                    channel=channel_number, power=interface.transmit_power
+                )
+            )
+            assert interface.wait_for_action(Id.ChannelTransmitPower)
+
+        if not interface.master:
+            self._write(
+                SetChannelSearchTimeoutMessage(
+                    channel=channel_number, timeout=interface.channel_search_timeout
+                )
+            )
+            assert interface.wait_for_action(Id.ChannelSearchTimeout)
+
+        self._write(OpenChannelMessage(channel=channel_number))
+        assert interface.wait_for_status(interface.Status.OPEN)
+
+    def close_and_unassign_channel(self, channel_number):
+        """Close and unassign channel."""
+        interface = self.channels[channel_number]
+        assert interface is not None
+        self._write(CloseChannelMessage(channel=channel_number))
+        assert interface.wait_for_status(interface.Status.CLOSED)
+        self._write(UnassignChannelMessage(channel=channel_number))
+        assert interface.wait_for_status(interface.Status.UNASSIGNED)
+        self.channels[channel_number] = None
+
+    def configure_continuous_scan(self, interface):
+        """Open channel 0 in continuous scanning mode."""
+        interface._handle_broadcast_data = (  # noqa PLW212
+            lambda data_page_number, info: None
+        )
+        interface._handle_acknowledged_data = (  # noqa PLW212
+            lambda data_page_number, info: None
+        )
+
+        if self.channels is not None:
+            for channel in self.channels:
+                assert channel is None
+        channel_number = self._get_next_channel()
+        self.channels[channel_number] = interface
+        interface.channel = channel_number
+        interface.channel_type = ChannelType.UnidirectionalReceiveOnly
         network = self._get_network_number(interface.network_key)
         self._write(
             AssignChannelMessage(
@@ -174,42 +277,8 @@ class Dongle:
             )
             interface.wait_for_action(Id.ChannelRfFrequency)
 
-        if interface.channel_period != 8192:
-            self._write(
-                SetChannelPeriodMessage(
-                    channel=channel_number, period=interface.channel_period
-                )
-            )
-            interface.wait_for_action(Id.ChannelPeriod)
-
-        if interface.transmit_power != power_0db:
-            self._write(
-                SetChannelTransmitPowerMessage(
-                    channel=channel_number, power=interface.transmit_power
-                )
-            )
-            interface.wait_for_action(Id.ChannelTransmitPower)
-
-        if not interface.master:
-            self._write(
-                SetChannelSearchTimeoutMessage(
-                    channel=channel_number, timeout=interface.channel_search_timeout
-                )
-            )
-            interface.wait_for_action(Id.ChannelSearchTimeout)
-
-        self._write(OpenChannelMessage(channel=channel_number))
+        self._write(OpenRxScanMessage())
         interface.wait_for_status(interface.Status.OPEN)
-
-    def close_and_unassign_channel(self, channel_number):
-        """Close and unassign channel."""
-        interface = self.channels[channel_number]
-        assert interface is not None
-        self._write(CloseChannelMessage(channel=channel_number))
-        assert interface.wait_for_status(interface.Status.CLOSED)
-        self._write(UnassignChannelMessage(channel=channel_number))
-        assert interface.wait_for_status(interface.Status.UNASSIGNED)
-        self.channels[channel_number] = None
 
     def _wait_for_response(self, channel, message_id, code):
         if self.read_thread_active:
@@ -244,6 +313,7 @@ class Dongle:
         if device is None:
             device = self.device
 
+            self.capabilities = None
             self.max_channels = None
             self.max_networks = None
             self.ant_version = None
@@ -298,6 +368,8 @@ class Dongle:
         self._write(RequestMessage.create(id=Id.Capabilities))
         response = self._read()
         response_dict = CapabilitiesMessage.to_dict(response)
+        self.logger.info("Received %s", response_dict)
+        self.capabilities = response_dict
         self.max_channels = response_dict["max_channels"]
         self.max_networks = response_dict["max_networks"]
 
@@ -370,7 +442,19 @@ class Dongle:
             and message_id == Id.SetNetworkKey
         ):
             self.network_flag = True
-            return True
+        if code == ChannelResponseMessage.Code.RESPONSE_NO_ERROR:
+            self.action = message_id
+            if message_id in (Id.EnableExtendedMessages, Id.SetNetworkKey):
+                self.logger.info("RESPONSE_NO_ERROR to %s", message_id)
+                return True
+        return False
+
+    def _wait_for_action(self, action, timeout=10):
+        """Return true when `self.action` equals `action`."""
+        start = time.time()
+        while time.time() - start < timeout:
+            if self.action == action:
+                return True
         return False
 
     def _handler_thread_function(self):
@@ -379,10 +463,27 @@ class Dongle:
                 rtn = None
                 message = self.read_message_from_deque()
                 message_dict = AntMessage.decompose_to_dict(message)
+                if self.save_messages_to_file:
+                    with open(self.message_log, "a", encoding="UTF-8", newline="") as f:
+                        csv_writer = csv.DictWriter(
+                            f,
+                            fieldnames=[
+                                "channel",
+                                "id",
+                                "info",
+                                "extended_data",
+                                "parsed_extended_data",
+                            ],
+                            extrasaction="ignore",
+                        )
+                        csv_writer.writerow(message_dict)
                 channel = message_dict["channel"]
-                if channel == 0 and message_dict["id"] == Id.ChannelResponse:
+                if message_dict["id"] == Id.ChannelResponse:
                     if self._channel_response_handler(message):
                         continue
+                if self.channels is None:
+                    self.logger.info("No channel handlers available.")
+                    continue
                 self.handler_logger.debug(
                     "Passed %s to %s", message_dict, self.channels[channel]
                 )

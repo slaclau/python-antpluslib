@@ -1,4 +1,4 @@
-"""Extension of :py:mod:`libantplus.interface` for ANT+."""
+"""Extension of :module:`fortius_ant.ant.interface` for ANT+."""
 from dataclasses import dataclass
 
 from libantplus.interface import AntInterface, UnsupportedPage
@@ -9,7 +9,7 @@ ant_plus_network_key = 0x45C372BDFB21A5B9
 
 
 class AntPlusInterface(AntInterface):
-    """Extension of :class:`libantplus.interface.AntInterface` for ANT+."""
+    """Extension of :class:`AntInterface` for ANT+."""
 
     interleave = 0
     interleave_reset: int
@@ -30,7 +30,7 @@ class AntPlusInterface(AntInterface):
         Data4 = 0xFF
 
     def __init__(self, master=True, device_number=0):
-        super().__init__(master, device_number)
+        super().__init__(master=master, device_number=device_number)
         self.p71_data = self.P71_Data()
 
     def initialize(self):
@@ -77,4 +77,5 @@ class AntPlusInterface(AntInterface):
                     return response
             except UnsupportedPage as e:
                 self.logger.info("Page 70: %s", e.message)
-        return AntInterface._handle_received_message(self, message, message_dict)
+        else:
+            return AntInterface._handle_received_message(self, message, message_dict)
